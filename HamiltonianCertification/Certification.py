@@ -54,6 +54,8 @@ class MyStateVector:
     
     def measure_in_basis(self, basis, qubits):
         assert len(basis) == len(qubits)
+        if len(qubits) == 0:
+            return []
         n = self.num_qubits
         qc = QuantumCircuit(n)
         
