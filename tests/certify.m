@@ -34,13 +34,16 @@ function acc = left(i, k, n, hyparg, lab)
             P{i} = c * c';
 
             hypc = kron(c, eye(2^(n-i)))' * hyparg;
-            hypc = hypc ./ sqrt(sum(conj(hypc) .* hypc));
+            phc = sum(conj(hypc) .* hypc);
+            hypc = hypc ./ sqrt(phc);
 
             labc = kron(c, eye(2^(n-i)))' * lab;
             plc = sum(conj(labc) .* labc);
             labc = labc ./ sqrt(plc);
 
-            acc = acc + plc * left(i+1, k, n, hypc, labc);
+            if plc > 0 && phc > 0
+                acc = acc + plc * left(i+1, k, n, hypc, labc);
+            end
         end
         P{i} = eye(2);
     end
@@ -100,8 +103,9 @@ function acc = right(i, k, n, hyparg, lab)
 
         P{k} = eye(2);
 
-        temp = cross(crd0, crd1);
-        temp = temp / norm(temp);
+        nul = null([crd0; crd1]);
+        rnd = randn(size(nul,2),1);
+        temp = (nul * rnd ./ norm(rnd))';
         acc = 0;
         for b = [blo2vec(temp),blo2vec(-temp)]
             P{i} = b * b';
@@ -115,7 +119,9 @@ function acc = right(i, k, n, hyparg, lab)
             plb = sum(conj(labb) .* labb);
             labb = labb ./ sqrt(plb);
 
-            acc = acc + plb * right(i+1, k, n, hypb, labb);
+            if plb > 0
+                acc = acc + plb * right(i+1, k, n, hypb, labb);
+            end
         end
         P{i} = eye(2);
     end
