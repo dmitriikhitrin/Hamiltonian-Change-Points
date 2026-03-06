@@ -8,6 +8,9 @@ from typing import Optional
 
 from Certification import MyStateVector, certify
 
+rng_seed = 42
+rng = np.random.default_rng(rng_seed)
+
 def get_rydberg_hamiltonian(num_qubits, Omega, Delta, rb, a=1):
     N, d = num_qubits, 1 << num_qubits
     I = np.eye(2); X = np.array([[0,1],[1,0]]); Z = np.array([[1,0],[0,-1]]); Nop = (I - Z)/2
@@ -37,7 +40,7 @@ def get_random_product_state(num_qubits):
 def get_random_clifford_product_state(num_qubits):
     state = np.array([1.0+0.0j])
     for _ in range(num_qubits):
-        cliff = random_clifford(1)
+        cliff = random_clifford(1, seed=rng)
         psi = Statevector.from_label('0').evolve(cliff).data
         state = np.kron(state, psi.astype(np.complex128, copy=False))
     return state.astype(np.complex128, copy=False)
@@ -93,7 +96,7 @@ class Experiment:
 
         # One fixed perturbation if per_qubits
         if self.perturbation_mode == "per_qubits":
-            P_fixed = random_hermitian(dim).data.astype(np.complex128)
+            P_fixed = random_hermitian(dim, seed=rng).data.astype(np.complex128)
             P_fixed /= np.linalg.norm(P_fixed)
 
         # Norm sweep
@@ -123,7 +126,7 @@ class Experiment:
 
                 if self.perturbation_mode == "per_run":
                     # new perturbation each run
-                    P = random_hermitian(dim).data.astype(np.complex128)
+                    P = random_hermitian(dim, seed=rng).data.astype(np.complex128)
                     P /= np.linalg.norm(P)
                     
                     A_lab = (-1j * tau * (H + norm * P)).astype(np.complex128)
