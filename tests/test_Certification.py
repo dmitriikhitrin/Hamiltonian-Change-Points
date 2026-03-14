@@ -1,16 +1,21 @@
 import pytest
+import numpy as np
 import matlab.engine
 from math import sqrt
+from multiprocessing import Pool
 from numpy.linalg import norm
 from qiskit.quantum_info import Statevector
 from HamiltonianCertification.Certification import certify, MyStateVector
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def engine():
     eng = matlab.engine.start_matlab()
     eng.cd('tests')
     yield eng
     eng.quit()
+
+def certify_python(hyp, lab, N):
+    return sum(certify(hyp, lab, return_prob=True) for _ in range(N))
 
 @pytest.mark.parametrize("hyp, lab", [
     ([1,0], [0,1]),
@@ -18,18 +23,20 @@ def engine():
     ([1,2,3,4,5,6,7,8], [9,0,1,2,3,4,5,6]),
     ([1,0,0,0], [0,0,0,1]),
     ([1,0,0,1,1,0,0,1], [1,1,1,1,1,1,1,1]),
-    ([sqrt(2),0,1,1], [1j,-1,1j,-1]),
+    ([sqrt(2),0,1,1], [1,1j,1,1j]),
     ([1,1,sqrt(2),0,1,1j,1j,-1], [1,-1j,0,0,1,1,0,0]),
 ])
 def test_certify_match(engine, hyp, lab):
+    hyp += 0.1 * np.random.rand(len(hyp),2).view(np.complex128).flatten()
+    lab += 0.1 * np.random.rand(len(lab),2).view(np.complex128).flatten()
+
     hyp_python = Statevector(hyp)
     hyp_python = MyStateVector(sv=hyp_python/norm(hyp_python))
     lab_python = Statevector(lab)
     lab_python = MyStateVector(sv=lab_python/norm(lab_python))
-    N = 1000
-    acc_python = 0
-    for _ in range(N):
-        acc_python += certify(hyp_python, lab_python) / N
+    j = 12
+    N = 1500
+    acc_python = sum(Pool(j).starmap(certify_python, [(hyp_python, lab_python, N) for _ in range(j)])) / (N * j)
 
     n = int.bit_length(len(hyp))-1
     hyp_matlab = engine.transpose(matlab.double(hyp_python.sv.data, is_complex=True))

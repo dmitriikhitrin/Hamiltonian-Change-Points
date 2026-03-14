@@ -97,12 +97,12 @@ class MyStateVector:
         hyp_x0 = self.get_conditioned_state(projectors0)
         projectors1 = [projector_dict[bit] for bit in x + '1'] + [np.eye(2) for _ in range(n - len(x) - 1)]
         hyp_x1 = self.get_conditioned_state(projectors1)
-        
+
         projectors = [np.eye(2) for _ in range(hyp_x0.num_qubits)]
         hyp_x0_t = hyp_x0
         hyp_x1_t = hyp_x1
         l = []
-        
+
         project_x = [projector_dict[bit] for bit in x]
         lab_x_t = lab.get_conditioned_state(project_x + [np.eye(2) for _ in range(n-k+1)])
         for t in range(n-k):
@@ -115,12 +115,11 @@ class MyStateVector:
             
             basis = get_orth_basis(rho_0_t, rho_1_t)
             meas = lab_x_t.measure_in_basis([basis], [1])[0]
-#             print(meas)
             projectors = [np.outer(meas, meas.conj())] + [np.eye(2) for _ in range(hyp_x0_t.num_qubits - 1)]
             l.append(meas)
         return [np.outer(meas, meas.conj()) for meas in l]
     
-def certify(hyp, lab):
+def certify(hyp, lab, return_prob=False):
     n = hyp.num_qubits
     k = np.random.choice(list(range(1, n+1)))
 
@@ -139,5 +138,4 @@ def certify(hyp, lab):
         hyp_prime = hyp.get_conditioned_state(project_x + [np.eye(2)] + l_projectors)
         lab_prime = lab.get_conditioned_state(project_x + [np.eye(2)] + l_projectors)
     accept_prob = np.abs(np.inner(hyp_prime.data.conj(), lab_prime.data))**2
-    return np.random.random() < accept_prob
-    
+    return accept_prob if return_prob else (np.random.random() < accept_prob)
