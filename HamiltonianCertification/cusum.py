@@ -1,7 +1,7 @@
 import random
 import os
 import numpy as np
-from math import log, inf
+from math import log, inf, sqrt
 from itertools import count, islice
 from functools import partial
 from matplotlib import pyplot as plt
@@ -26,10 +26,10 @@ def rydberg_sequence(n, nu, nt, d, **param):
         diff = d[1] if (t >= nu and t < nu+nt) else d[0]
         yield (H := H + diff * random_hermitian(1<<n, seed=utils.rng).data)
 
-def cusum(seq, h, p, q):
+def cusum(seq, h, p, q, shots=1):
     ''' Run CUSUM algorithm.
     seq:    sequence of Booleans
-    p, q:   parameters of Bernoullis
+    p, q:   rejection probabilities
     h:      termination threshold
     '''
     z = [log((1-q)/(1-p)),log(q/p)]
@@ -39,7 +39,7 @@ def cusum(seq, h, p, q):
             x = int(next(seq))
         except StopIteration:
             return
-        yield (Z := max(0, Z + z[x]))
+        yield (Z := max(0, Z + x*z[1]+(shots-x)*z[0]))
 
 class Changepoint:
     def __init__(self, n, tau, H0):
@@ -47,16 +47,17 @@ class Changepoint:
         self.tau = tau
         self.H0 = H0
 
-    def test(self, H):
+    def test(self, H, shots=1):
 
         # Create hypothesis and lab states
         psi0 = get_random_clifford_product_state(self.n)
         hyp = expm_multiply(-1j * self.tau * self.H0, psi0)
         lab = expm_multiply(-1j * self.tau * H, psi0)
 
-        return not certify(
+        return np.random.binomial(shots, 1-certify(
             MyStateVector(sv=Statevector(hyp)),
-            MyStateVector(sv=Statevector(lab)))
+            MyStateVector(sv=Statevector(lab)),
+            return_prob=True))
 
 def plot_example(ax, nu):
     random.seed(42)
@@ -71,17 +72,18 @@ def plot_example(ax, nu):
     tau = 0.1
 
     n = 1
-    xi = 0.15
-    d = (1e0, 1e1)
-    nmx = 70
-    vmx = 20
+    s = 1000
+    xi = 5e-5
+    d = (2e-2, 2e-1)
+    nmx = 1
+    vmx = 14
 
     H_seq = islice(rydberg_sequence(n, nu, 10, d, Omega=1, Delta=2.5, rb=1.5, a=1), seq_len+1)
     H0 = next(H_seq)
     H_seq = list(H_seq)
     cpt = Changepoint(n, tau, H0)
     val = np.asarray(list(
-        list(cusum(map(cpt.test, H_seq), inf, xi/(2*n), xi/n))
+        list(cusum(map(partial(cpt.test, shots=s), H_seq), inf, xi/(2*n), xi/n, shots=s))
         for _ in range(num_tri)))
 
     # X axes
@@ -102,7 +104,7 @@ def plot_example(ax, nu):
     ax2.yaxis.set_minor_locator(MultipleLocator(1))
 
     # Series
-    nms = list(map(lambda H: norm(H-H0, 'fro').item(), H_seq))
+    nms = list(map(lambda H: norm(H-H0, 'fro').item() / sqrt(1<<n), H_seq))
     stp = [tau*(i+1) for i in range(seq_len)]
     plt_nms, = ax.plot(stp, nms, color=col_nms, linestyle='dotted')
     plt_val, = ax2.plot(stp, np.median(val,axis=0), color=col_val)
@@ -115,7 +117,7 @@ def plot_example(ax, nu):
         ax.text(1.015*tau*nu, 11/14*nmx, 'Changepoint', rotation=90, color='chocolate')
 
 if __name__ == "__main__":
-    figs_dir = "../figs"
+    figs_dir = "figs"
     os.makedirs(figs_dir, exist_ok=True)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
