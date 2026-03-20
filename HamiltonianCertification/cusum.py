@@ -12,7 +12,7 @@ from scipy.sparse.linalg import expm_multiply
 from qiskit.quantum_info import random_hermitian, Statevector
 from utils import get_rydberg_hamiltonian, get_random_clifford_product_state
 import utils
-from Certification import MyStateVector, certify
+from Certification import MyStateVector, cert_prob
 
 
 def rydberg_sequence(n, nu, nt, d, **param):
@@ -55,24 +55,23 @@ class Changepoint:
         hyp = expm_multiply(-1j * self.tau * self.H0, psi0)
         lab = expm_multiply(-1j * self.tau * H, psi0)
 
-        return np.random.binomial(shots, 1-certify(
+        return np.random.binomial(shots, 1-cert_prob(
             MyStateVector(sv=Statevector(hyp)),
-            MyStateVector(sv=Statevector(lab)),
-            return_prob=True))
+            MyStateVector(sv=Statevector(lab))))
 
-def set_random(seed):
+def _set_random(seed):
     random.seed(seed)
     np.random.seed(seed)
     utils.rng = np.random.default_rng(seed)
 
-def run_cusum(seed, num_tri, cpt, H_seq, xi, n, s):
-    set_random(seed)
+def _run_cusum(seed, num_tri, cpt, H_seq, xi, n, s):
+    _set_random(seed)
     return list(
         list(cusum(map(partial(cpt.test, shots=s), H_seq), inf, xi/(2*n), xi/n, shots=s))
         for _ in range(num_tri))
 
 def plot_example(ax, nu, cid):
-    set_random(42)
+    _set_random(42)
 
     col_nms = 'blue'
     col_val = 'red'
@@ -93,12 +92,13 @@ def plot_example(ax, nu, cid):
     H0 = next(H_seq)
     H_seq = list(H_seq)
     cpt = Changepoint(n, tau, H0)
-    val = np.concatenate(Pool(j).starmap(run_cusum, [(42+i, num_tri, cpt, H_seq, xi, n, s) for i in range(j)]))
+    val = np.concatenate(Pool(j).starmap(_run_cusum, [(42+i, num_tri, cpt, H_seq, xi, n, s) for i in range(j)]))
 
     # X axes
     ax.xaxis.set_major_locator(MultipleLocator(2))
     ax.xaxis.set_minor_locator(MultipleLocator(1))
     ax.set_xlabel('Total evolution time')
+    ax.text(1.05*seq_len*tau, -0.1075*nmx, f'x{s}')
 
     # Y axes
     lim = lambda x: (-0.05*x, 1.05*x)

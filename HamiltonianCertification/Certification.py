@@ -139,3 +139,32 @@ def certify(hyp, lab, return_prob=False):
         lab_prime = lab.get_conditioned_state(project_x + [np.eye(2)] + l_projectors)
     accept_prob = np.abs(np.inner(hyp_prime.data.conj(), lab_prime.data))**2
     return accept_prob if return_prob else (np.random.random() < accept_prob)
+
+def _meas_comp(hyp, lab, k):
+    if k == 0:
+        return _meas_dt(hyp, lab)
+    n = hyp.num_qubits
+    pr = lab.sv.probabilities(qargs=[n-1])
+    cond = lambda x, sv: sv.get_conditioned_state([projector_dict[str(x)]] + [np.eye(2)]*(n-1))
+    return sum(pr[x] * _meas_comp(cond(x, hyp), cond(x, lab), k-1) for x in [0,1])
+
+def _meas_dt(hyp, lab):
+    n = hyp.num_qubits
+    if n == 1:
+        return np.abs(np.inner(hyp.data.conj(), lab.data))**2
+    rho = lambda x: partial_trace(hyp.get_conditioned_state([projector_dict[str(x)]] + [np.eye(2)]*(n-1)).sv, range(n-2))
+    b = get_orth_basis(rho(0), rho(1))
+    qc = QuantumCircuit(n)
+    qc.append(basis_to_unitary(b[0], b[1]), [n-2])
+    pr = lab.sv.copy().evolve(qc.inverse()).probabilities(qargs=[n-2])
+    cond = lambda x, sv: sv.get_conditioned_state([np.eye(2), np.outer(b[x], b[x].conj())] + [np.eye(2)]*(n-2))
+    return sum(pr[x] * _meas_dt(cond(x, hyp), cond(x, lab)) for x in [0,1])
+
+def cert_prob(hyp, lab):
+    '''Averaged over all k and DT paths'''
+    n = hyp.num_qubits
+    accept_prob = 0
+    for k in range(n):
+        accept_prob += _meas_comp(hyp, lab, k)
+    accept_prob /= n
+    return accept_prob
