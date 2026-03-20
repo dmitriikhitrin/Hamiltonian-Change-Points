@@ -4,6 +4,7 @@ import numpy as np
 from math import log, inf, sqrt
 from itertools import count, islice
 from functools import partial
+from multiprocessing import Pool
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from numpy.linalg import norm
@@ -59,32 +60,40 @@ class Changepoint:
             MyStateVector(sv=Statevector(lab)),
             return_prob=True))
 
-def plot_example(ax, nu):
-    random.seed(42)
-    np.random.seed(42)
-    utils.rng = np.random.default_rng(42)
+def set_random(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    utils.rng = np.random.default_rng(seed)
+
+def run_cusum(seed, num_tri, cpt, H_seq, xi, n, s):
+    set_random(seed)
+    return list(
+        list(cusum(map(partial(cpt.test, shots=s), H_seq), inf, xi/(2*n), xi/n, shots=s))
+        for _ in range(num_tri))
+
+def plot_example(ax, nu, cid):
+    set_random(42)
 
     col_nms = 'blue'
     col_val = 'red'
 
     seq_len = 200
-    num_tri = 120
+    num_tri = 10
+    j = 12
     tau = 0.1
 
-    n = 1
-    s = 1000
-    xi = 5e-5
-    d = (2e-2, 2e-1)
-    nmx = 1
-    vmx = 14
+    n = [1, 3, 5][cid]
+    s = [1000, 100, 100][cid]
+    xi = [5e-5, 2e-3, 2e-3][cid]
+    d = [(2e-2, 2e-1), (1e-2, 1e-1), (5e-3, 5e-2)][cid]
+    nmx = [1, 0.8, 0.8][cid]
+    vmx = [14, 14, 14][cid]
 
     H_seq = islice(rydberg_sequence(n, nu, 10, d, Omega=1, Delta=2.5, rb=1.5, a=1), seq_len+1)
     H0 = next(H_seq)
     H_seq = list(H_seq)
     cpt = Changepoint(n, tau, H0)
-    val = np.asarray(list(
-        list(cusum(map(partial(cpt.test, shots=s), H_seq), inf, xi/(2*n), xi/n, shots=s))
-        for _ in range(num_tri)))
+    val = np.concatenate(Pool(j).starmap(run_cusum, [(42+i, num_tri, cpt, H_seq, xi, n, s) for i in range(j)]))
 
     # X axes
     ax.xaxis.set_major_locator(MultipleLocator(2))
@@ -123,6 +132,6 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     fig.subplots_adjust(wspace=0.3)
     for ax, nu in zip(axes, [100, inf]):
-        plot_example(ax, nu)
+        plot_example(ax, nu, 1)
     plt.savefig(os.path.join(figs_dir, "cusum_example.pdf"))
     plt.show()
