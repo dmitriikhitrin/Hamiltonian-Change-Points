@@ -10,8 +10,9 @@ from matplotlib.ticker import MultipleLocator
 from numpy.linalg import norm
 from scipy.sparse.linalg import expm_multiply
 from qiskit.quantum_info import random_hermitian, Statevector
-from utils import get_rydberg_hamiltonian, get_random_clifford_product_state
+
 import utils
+from utils import get_rydberg_hamiltonian, get_random_clifford_product_state
 from Certification import MyStateVector, cert_prob
 
 
