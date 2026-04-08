@@ -1,5 +1,5 @@
 # Hamiltonian Change Points
-Numerical analysis for the work *Autonomous Hamiltonian certification and changepoint detection*.
+Numerical analysis for the work [*Autonomous Hamiltonian certification and changepoint detection*](https://arxiv.org/abs/2603.26655).
 
 Implemented primarily using the `qiskit` package.
 
