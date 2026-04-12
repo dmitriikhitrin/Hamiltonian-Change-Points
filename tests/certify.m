@@ -3,6 +3,7 @@
 %   Meghal Gupta, William He, Ryan O'Donnell
 % The hypothesis state is accessed both directly and through oracles.
 % These two methods are asserted to be equivalent throughout the algorithm.
+% Uses QETLAB version 0.9.
 
 function acc = certify(n, hyparg, lab)
 	assert(all(size(lab) == size(hyparg)));
